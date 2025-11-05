@@ -13,22 +13,23 @@
 <body>
   <h2>Create Ticket</h2>
   <form id="createForm">
-    <input type="text" id="shortDescription" placeholder="Short Description" required />
+    <input type="text" id="shortDescription" placeholder="Ticket Number" required />
     <textarea id="description" placeholder="Description" required></textarea>
     <button type="submit">Create Ticket</button>
   </form>
 
-  <h2>Print Ticket</h2>
-  <form id="printForm">
-    <input type="text" id="ticketNumber" placeholder="Ticket Number" required />
-    <textarea id="ticketDescription" placeholder="Description" required></textarea>
-    <button type="submit">Print Ticket</button>
-  </form>
-
+  <h2>Printed Tickets</h2>
+  <button id="refresh">Refresh Tickets</button>
   <div class="output" id="output"></div>
 
   <script>
     const apiBase = "http://localhost:8000";
+
+    async function loadTickets() {
+      const response = await fetch(`${apiBase}/get_printed_tickets`);
+      const result = await response.json();
+      document.getElementById("output").innerText = JSON.stringify(result, null, 2);
+    }
 
     document.getElementById("createForm").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -43,24 +44,16 @@
         method: "POST",
         body: formData
       });
-      const result = await response.json();
-      document.getElementById("output").innerText = JSON.stringify(result, null, 2);
+      await response.json();
+
+      // Refresh printed tickets automatically
+      setTimeout(loadTickets, 1000);
     });
 
-    document.getElementById("printForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const ticket_number = document.getElementById("ticketNumber").value;
-      const description = document.getElementById("ticketDescription").value;
+    document.getElementById("refresh").addEventListener("click", loadTickets);
 
-      const response = await fetch(`${apiBase}/print_ticket`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticket_number, description })
-      });
-
-      const result = await response.json();
-      document.getElementById("output").innerText = JSON.stringify(result, null, 2);
-    });
+    // Initial load
+    loadTickets();
   </script>
 </body>
 </html>
