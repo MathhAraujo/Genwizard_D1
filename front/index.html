@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ticket API Frontend</title>
+  <style>
+    body { font-family: Arial; margin: 40px; }
+    input, textarea, button { display: block; margin: 10px 0; width: 300px; }
+    .output { margin-top: 20px; background: #f1f1f1; padding: 10px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <h2>Create Ticket</h2>
+  <form id="createForm">
+    <input type="text" id="shortDescription" placeholder="Short Description" required />
+    <textarea id="description" placeholder="Description" required></textarea>
+    <button type="submit">Create Ticket</button>
+  </form>
+
+  <h2>Print Ticket</h2>
+  <form id="printForm">
+    <input type="text" id="ticketNumber" placeholder="Ticket Number" required />
+    <textarea id="ticketDescription" placeholder="Description" required></textarea>
+    <button type="submit">Print Ticket</button>
+  </form>
+
+  <div class="output" id="output"></div>
+
+  <script>
+    const apiBase = "http://localhost:8000";
+
+    document.getElementById("createForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const shortDescription = document.getElementById("shortDescription").value;
+      const description = document.getElementById("description").value;
+
+      const formData = new FormData();
+      formData.append("shortDescription", shortDescription);
+      formData.append("description", description);
+
+      const response = await fetch(`${apiBase}/create_ticket`, {
+        method: "POST",
+        body: formData
+      });
+      const result = await response.json();
+      document.getElementById("output").innerText = JSON.stringify(result, null, 2);
+    });
+
+    document.getElementById("printForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const ticket_number = document.getElementById("ticketNumber").value;
+      const description = document.getElementById("ticketDescription").value;
+
+      const response = await fetch(`${apiBase}/print_ticket`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticket_number, description })
+      });
+
+      const result = await response.json();
+      document.getElementById("output").innerText = JSON.stringify(result, null, 2);
+    });
+  </script>
+</body>
+</html>
