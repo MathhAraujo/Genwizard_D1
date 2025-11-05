@@ -3,36 +3,115 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ticket API Frontend</title>
+  <title>Ticket System</title>
   <style>
-    body { font-family: Arial; margin: 40px; }
-    input, textarea, button { display: block; margin: 10px 0; width: 300px; }
-    .output { margin-top: 20px; background: #f1f1f1; padding: 10px; border-radius: 6px; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      background: #fafafa;
+    }
+    h2 {
+      color: #333;
+    }
+    form {
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      width: 400px;
+      margin-bottom: 30px;
+    }
+    input, textarea, button {
+      display: block;
+      width: 100%;
+      margin: 10px 0;
+      padding: 10px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    .tickets {
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      width: 400px;
+    }
+    .ticket {
+      border-bottom: 1px solid #ddd;
+      padding: 10px 0;
+    }
+    .ticket:last-child {
+      border-bottom: none;
+    }
+    .ticket-number {
+      font-weight: bold;
+      color: #222;
+    }
+    .ticket-desc {
+      margin-top: 4px;
+      color: #555;
+    }
   </style>
 </head>
 <body>
   <h2>Create Ticket</h2>
   <form id="createForm">
-    <input type="text" id="shortDescription" placeholder="Ticket Number" required />
-    <textarea id="description" placeholder="Description" required></textarea>
+    <input type="text" id="shortDescription" placeholder="Ticket Title" required />
+    <textarea id="description" placeholder="Ticket Description" required></textarea>
     <button type="submit">Create Ticket</button>
   </form>
 
   <h2>Printed Tickets</h2>
-  <button id="refresh">Refresh Tickets</button>
-  <div class="output" id="output"></div>
+  <div class="tickets" id="ticketsList">
+    <em>Loading tickets...</em>
+  </div>
 
   <script>
+    // === Backend URL ===
     const apiBase = "http://localhost:8000";
 
+    // === Fetch printed tickets ===
     async function loadTickets() {
-      const response = await fetch(`${apiBase}/get_printed_tickets`);
-      const result = await response.json();
-      document.getElementById("output").innerText = JSON.stringify(result, null, 2);
+      try {
+        const response = await fetch(`${apiBase}/get_printed_tickets`);
+        const result = await response.json();
+
+        const ticketsContainer = document.getElementById("ticketsList");
+        ticketsContainer.innerHTML = "";
+
+        if (result.tickets.length === 0) {
+          ticketsContainer.innerHTML = "<em>No tickets printed yet.</em>";
+          return;
+        }
+
+        result.tickets.forEach(ticket => {
+          const div = document.createElement("div");
+          div.classList.add("ticket");
+          div.innerHTML = `
+            <div class="ticket-number"># ${ticket.ticket_number}</div>
+            <div class="ticket-desc">${ticket.description}</div>
+          `;
+          ticketsContainer.appendChild(div);
+        });
+      } catch (err) {
+        console.error("Error loading tickets:", err);
+      }
     }
 
+    // === Handle ticket creation ===
     document.getElementById("createForm").addEventListener("submit", async (e) => {
       e.preventDefault();
+
       const shortDescription = document.getElementById("shortDescription").value;
       const description = document.getElementById("description").value;
 
@@ -40,20 +119,28 @@
       formData.append("shortDescription", shortDescription);
       formData.append("description", description);
 
-      const response = await fetch(`${apiBase}/create_ticket`, {
-        method: "POST",
-        body: formData
-      });
-      await response.json();
+      try {
+        const response = await fetch(`${apiBase}/create_ticket`, {
+          method: "POST",
+          body: formData
+        });
 
-      // Refresh printed tickets automatically
-      setTimeout(loadTickets, 1000);
+        const result = await response.json();
+        console.log("Ticket created:", result);
+
+        // Clear form
+        e.target.reset();
+
+        // Refresh printed tickets after short delay
+        setTimeout(loadTickets, 1500);
+      } catch (err) {
+        console.error("Error creating ticket:", err);
+      }
     });
 
-    document.getElementById("refresh").addEventListener("click", loadTickets);
-
-    // Initial load
+    // === Auto-refresh tickets every 5 seconds ===
     loadTickets();
+    setInterval(loadTickets, 5000);
   </script>
 </body>
 </html>
