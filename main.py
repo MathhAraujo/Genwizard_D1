@@ -103,25 +103,7 @@ async def create_ticket(
     prblm_type = "KO"
     origin = "Recife"
 
-    # Step 1: send to external API first
     result = send_events(priority, label, value, resource, sub_resource, env, tower, prblm_type, origin, description)
-
-    # Step 2: only print after external API returns success
-    if result.get("status") == "success":
-        async with AsyncClient() as client:
-            try:
-                await client.post(
-                    "https://genwizard-d1.onrender.com/print_ticket_internal",
-                    json={
-                        "ticket_number": shortDescription,
-                        "description": description,
-                    },
-                )
-            except Exception as e:
-                print("Error calling internal print:", e)
-
-    return JSONResponse(content=result)
-
 
 # === Endpoint to fetch printed tickets ===
 @app.get("/get_printed_tickets")

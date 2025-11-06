@@ -20,6 +20,7 @@
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
       width: 400px;
       margin-bottom: 30px;
+      position: relative;
     }
     input, textarea, button {
       display: block;
@@ -35,9 +36,26 @@
       color: white;
       font-weight: bold;
       cursor: pointer;
+      transition: 0.2s;
     }
-    button:hover {
+    button:hover:not(:disabled) {
       background-color: #45a049;
+    }
+    button:disabled {
+      background-color: #a5d6a7;
+      cursor: not-allowed;
+    }
+    .loading {
+      display: none;
+      color: #4CAF50;
+      font-weight: bold;
+      text-align: center;
+      margin-top: 10px;
+      animation: blink 1.2s infinite;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
     }
     .tickets {
       background: #fff;
@@ -68,7 +86,8 @@
   <form id="createForm">
     <input type="text" id="shortDescription" placeholder="Ticket Title" required />
     <textarea id="description" placeholder="Ticket Description" required></textarea>
-    <button type="submit">Create Ticket</button>
+    <button type="submit" id="createBtn">Create Ticket</button>
+    <div class="loading" id="loadingMsg">Sending ticket...</div>
   </form>
 
   <h2>Printed Tickets</h2>
@@ -76,71 +95,84 @@
     <em>Loading tickets...</em>
   </div>
 
-  <script>
-    // === Backend URL ===
-    const apiBase = "https://genwizard-d1.onrender.com";
+ <script>
+  // === Backend URL ===
+  const apiBase = "https://genwizard-d1.onrender.com";
 
-    // === Fetch printed tickets ===
-    async function loadTickets() {
-      try {
-        const response = await fetch(`${apiBase}/get_printed_tickets`);
-        const result = await response.json();
+  // === Fetch printed tickets ===
+  async function loadTickets() {
+    try {
+      const response = await fetch(`${apiBase}/get_printed_tickets`);
+      const result = await response.json();
 
-        const ticketsContainer = document.getElementById("ticketsList");
-        ticketsContainer.innerHTML = "";
+      const ticketsContainer = document.getElementById("ticketsList");
+      ticketsContainer.innerHTML = "";
 
-        if (result.tickets.length === 0) {
-          ticketsContainer.innerHTML = "<em>No tickets printed yet.</em>";
-          return;
-        }
-
-        result.tickets.forEach(ticket => {
-          const div = document.createElement("div");
-          div.classList.add("ticket");
-          div.innerHTML = `
-            <div class="ticket-number"># ${ticket.ticket_number}</div>
-            <div class="ticket-desc">${ticket.description}</div>
-          `;
-          ticketsContainer.appendChild(div);
-        });
-      } catch (err) {
-        console.error("Error loading tickets:", err);
+      if (!result.tickets || result.tickets.length === 0) {
+        ticketsContainer.innerHTML = "<em>No tickets printed yet.</em>";
+        return;
       }
+
+      result.tickets.forEach(ticket => {
+        const div = document.createElement("div");
+        div.classList.add("ticket");
+        div.innerHTML = `
+          <div class="ticket-number"># ${ticket.ticket_number}</div>
+          <div class="ticket-desc">${ticket.description}</div>
+        `;
+        ticketsContainer.appendChild(div);
+      });
+    } catch (err) {
+      console.error("Error loading tickets:", err);
     }
+  }
 
-    // === Handle ticket creation ===
-    document.getElementById("createForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
+  // === Handle ticket creation ===
+  document.getElementById("createForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-      const shortDescription = document.getElementById("shortDescription").value;
-      const description = document.getElementById("description").value;
+    const shortDescription = document.getElementById("shortDescription").value.trim();
+    const description = document.getElementById("description").value.trim();
 
-      const formData = new FormData();
-      formData.append("shortDescription", shortDescription);
-      formData.append("description", description);
+    if (!shortDescription || !description) return;
 
-      try {
-        const response = await fetch(`${apiBase}/create_ticket`, {
-          method: "POST",
-          body: formData
-        });
+    const formData = new FormData();
+    formData.append("shortDescription", shortDescription);
+    formData.append("description", description);
 
-        const result = await response.json();
-        console.log("Ticket created:", result);
+    try {
+      // Show loading state
+      const btn = e.target.querySelector("button");
+      const originalText = btn.textContent;
+      btn.textContent = "Creating...";
+      btn.disabled = true;
 
-        // Clear form
-        e.target.reset();
+      // Create ticket
+      const response = await fetch(`${apiBase}/create_ticket`, {
+        method: "POST",
+        body: formData
+      });
 
-        // Refresh printed tickets after short delay
-        setTimeout(loadTickets, 1500);
-      } catch (err) {
-        console.error("Error creating ticket:", err);
-      }
-    });
+      const result = await response.json();
+      console.log("Ticket created:", result);
 
-    // === Auto-refresh tickets every 5 seconds ===
-    loadTickets();
-    setInterval(loadTickets, 5000);
-  </script>
+      // Wait 4 seconds for backend to process and print
+      setTimeout(loadTickets, 4000);
+
+      // Reset form
+      e.target.reset();
+
+      // Restore button
+      btn.textContent = originalText;
+      btn.disabled = false;
+    } catch (err) {
+      console.error("Error creating ticket:", err);
+    }
+  });
+
+  // === Auto-refresh tickets every 10 seconds ===
+  loadTickets();
+  setInterval(loadTickets, 10000);
+</script>
 </body>
 </html>
