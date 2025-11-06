@@ -7,18 +7,19 @@ from datetime import datetime
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import uvicorn
-import asyncio
-from httpx import post
 import os
+import asyncio
+from httpx import AsyncClient
 
 app = FastAPI()
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# === CORS (adjust later to your frontend domain) ===
+# === Allow frontend access ===
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Restrict later to your frontend domain if needed
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -28,7 +29,7 @@ app.add_middleware(
 printed_tickets = []
 
 
-# === External event sender ===
+# === External API sender ===
 def send_events(priority, label, value, resource, sub_resource, env, tower, prblm_type, origin, description):
     trigger_time = str(datetime.now().timestamp()).split('.')[0]
 
@@ -66,32 +67,37 @@ def send_events(priority, label, value, resource, sub_resource, env, tower, prbl
         return {"status": "error", "details": str(e)}
 
 
-# === Internal print endpoint (backend-only) ===
+# === Pydantic model for tickets ===
+class Ticket(BaseModel):
+    ticket_number: str
+    description: str
+
+
+# === Internal print endpoint (backend-only, JSON body expected) ===
 @app.post("/print_ticket_internal")
-async def print_ticket_internal(ticket_number: str, description: str):
-    ticket = {"ticket_number": ticket_number, "description": description}
-    printed_tickets.append(ticket)
+async def print_ticket_internal(ticket: Ticket):
+    ticket_data = ticket.dict()
+    printed_tickets.append(ticket_data)
 
     print("=== Printing Ticket ===")
-    print(f"Ticket Number: {ticket_number}")
-    print(f"Description: {description}")
+    print(f"Ticket Number: {ticket.ticket_number}")
+    print(f"Description: {ticket.description}")
     print("=======================")
 
-    return JSONResponse(content=ticket)
+    return JSONResponse(content=ticket_data)
 
 
 # === Public endpoint to create a new ticket ===
 @app.post("/create_ticket")
 async def create_ticket(
-    request: Request,
     shortDescription: str = Form(...),
     description: str = Form(...)
 ):
     priority = "Low"
     label = shortDescription
     value = "Operation"
-    resource = "".join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
-    sub_resource = "".join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+    resource = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+    sub_resource = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(8))
     env = "DEV"
     tower = "Matheus Araujo"
     prblm_type = "KO"
@@ -100,27 +106,23 @@ async def create_ticket(
     # Send event to external API
     result = send_events(priority, label, value, resource, sub_resource, env, tower, prblm_type, origin, description)
 
-    # Always call internal print using dynamic base URL
-    try:
-        base_url = str(request.base_url).rstrip("/")
-        internal_url = f"{base_url}/print_ticket_internal"
-
-        await asyncio.to_thread(
-            post,
-            internal_url,
-            params={
-                "ticket_number": shortDescription,
-                "description": description,
-            },
-            timeout=10.0
-        )
-    except Exception as e:
-        print("Error calling internal print endpoint:", e)
+    # Call internal print endpoint (async, sends JSON)
+    async with AsyncClient() as client:
+        try:
+            await client.post(
+                "https://genwizard-d1.onrender.com/print_ticket_internal",
+                json={
+                    "ticket_number": shortDescription,
+                    "description": description,
+                },
+            )
+        except Exception as e:
+            print("Error calling internal print:", e)
 
     return JSONResponse(content=result)
 
 
-# === Public endpoint: list printed tickets ===
+# === Public endpoint: list all printed tickets ===
 @app.get("/get_printed_tickets")
 async def get_printed_tickets():
     return JSONResponse(content={"tickets": printed_tickets})
